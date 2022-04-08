@@ -133,11 +133,7 @@ impl Expression {
                     if value_stack.len() < *elements {
                         return Null;
                     }
-                    let mut element_stack = Vec::<Value>::new();
-                    for _ in 0..*elements {
-                        element_stack.push(value_stack.pop().unwrap());
-                    }
-                    element_stack.reverse();
+                    let element_stack = value_stack.split_off(value_stack.len() - elements);
                     value_stack.push(Array(element_stack));
                 }
                 ExpressionToken::Object(elements) => {
@@ -158,16 +154,11 @@ impl Expression {
                     if value_stack.len() < *arguments {
                         return Null;
                     }
-                    let mut argument_stack = Vec::<Value>::new();
-                    for _ in 0..*arguments {
-                        argument_stack.push(value_stack.pop().unwrap());
-                    }
-                    argument_stack.reverse();
+                    let argument_stack = value_stack.split_off(value_stack.len() - arguments);
                     value_stack.push(Value::eval_function(function, argument_stack));
                 }
             }
         }
-
         return value_stack.pop().unwrap_or(Null);
     }
 
@@ -199,14 +190,6 @@ pub enum ParserToken {
 }
 
 impl ParserToken {
-    pub fn is_value(&self) -> bool {
-        match self {
-            ParserToken::Constant(_) |
-            ParserToken::Variable(_) => true,
-            _ => false
-        }
-    }
-
     fn is_operator(&self) -> bool {
         match self {
             ParserToken::Operator(_) => true,
@@ -557,14 +540,11 @@ impl Parser for ExpressionParser {
             token = Some(start);
         }
         else if let Some(_) = self.get_token(&ARRAY_END_REGEX, slice) {
-            let end_token = match self.token_stack.pop() {
+            token = match self.token_stack.pop() {
                 Some(ParserToken::ArrayStart) => Some(ParserToken::ArrayEnd),
                 Some(ParserToken::IndexStart) => Some(ParserToken::IndexEnd),
                 _ => None
             };
-            if let Some(end) = end_token {
-                token = Some(end);
-            }
         }
         else if let Some(_) = self.get_token(&OBJECT_START_REGEX, slice) {
             token = Some(ParserToken::ObjectStart);
@@ -709,18 +689,15 @@ impl Parser for ExpressionParser {
         match (self.last.as_ref(), token.as_ref()) {
             (None, Some(ParserToken::Operator(_)))
             | (Some(ParserToken::IndexEnd), Some(ParserToken::ObjectStart))
-            | (Some(ParserToken::IndexEnd), Some(ParserToken::ObjectEnd))
             | (Some(ParserToken::RightParen), Some(ParserToken::LeftParen))
             | (Some(ParserToken::RightParen), Some(ParserToken::ObjectStart))
             | (Some(ParserToken::ArrayEnd), Some(ParserToken::Constant(_)))
             | (Some(ParserToken::ArrayEnd), Some(ParserToken::Variable(_)))
             | (Some(ParserToken::ArrayEnd), Some(ParserToken::ObjectStart))
             | (Some(ParserToken::Constant(_)), Some(ParserToken::ObjectStart))
-            | (Some(ParserToken::Constant(_)), Some(ParserToken::ObjectEnd))
             | (Some(ParserToken::Constant(_)), Some(ParserToken::Constant(_)))
             | (Some(ParserToken::Constant(_)), Some(ParserToken::Variable(_)))
             | (Some(ParserToken::Variable(_)), Some(ParserToken::ObjectStart))
-            | (Some(ParserToken::Variable(_)), Some(ParserToken::ObjectEnd))
             | (Some(ParserToken::Variable(_)), Some(ParserToken::Variable(_)))
             | (Some(ParserToken::Variable(_)), Some(ParserToken::Constant(_)))
             | (Some(ParserToken::Operator(_)), Some(ParserToken::Operator(_)))

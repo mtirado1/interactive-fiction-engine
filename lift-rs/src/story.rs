@@ -109,9 +109,7 @@ impl State {
     fn new(story: &Story) -> State {
         let mut local = HashMap::<String, HashMap<String, Value>>::new();
         for (title, _) in story.pages.iter() {
-            let mut s = HashMap::<String, Value>::new();
-            s.insert("visited".to_string(), Value::Integer(0));
-            local.insert(title.to_string(), s);
+            local.insert(title.to_string(), HashMap::<String, Value>::new());
         }
         State {
             current_page: story.first_page.clone(),
