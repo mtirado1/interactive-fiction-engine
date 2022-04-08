@@ -210,12 +210,10 @@ impl Parser for ContentParser {
             static ref COMMAND_END_REGEX: Regex = Regex::new(r"^[^\S\n]*(\n|)").unwrap();
         }
         let mut slice = string;
-        let mut size: usize = 0;
 
         if let Some(capture) = COMMENT_REGEX.captures(slice) {
             let comment = capture.get(0).unwrap().as_str();
             slice = &slice[comment.len()..];
-            size += comment.len();
         }
 
         let expected_token = match self.capture_level {
@@ -226,17 +224,16 @@ impl Parser for ContentParser {
         
         let next_token = parser.next(slice);
         if let ParserResult::Some(text_content, text_size) = next_token {
-            size += text_size;
-            return ParserResult::Some(Self::Token::Text(text_content), size);
+            slice = &slice[text_size..];
+            return ParserResult::Some(Self::Token::Text(text_content), string.len() - slice.len());
         }
         else if let ParserResult::None(text_size) = next_token {
-            size += text_size;
             slice = &slice[text_size..];
         }
         if let Some(capture) = COMMAND_REGEX.captures(slice) {
             let command_name = capture.name("name").unwrap().as_str();
-            size += capture.get(0).unwrap().as_str().len();
-            slice = &string[size..];
+            let command_size = capture.get(0).unwrap().as_str().len();
+            slice = &slice[command_size..];
 
             let expect: Vec<Expect> = match command_name {
                 "link" => vec![
@@ -274,11 +271,12 @@ impl Parser for ContentParser {
                 if let Some(Params::Block) = params.last() {
                     self.capture_level += 1;
                 }
-                size = string.len() - slice.len();
                 if let Some(capture) = COMMAND_END_REGEX.captures(slice) {
-                    size += capture.get(0).unwrap().as_str().len();
+                    let size = capture.get(0).unwrap().as_str().len();
+                    slice = &slice[size..];
                 }
-                return ParserResult::Some(Self::Token::Command(command_name.to_string(), params), size);
+                let final_size = string.len() - slice.len();
+                return ParserResult::Some(Self::Token::Command(command_name.to_string(), params), final_size);
             }
             else {
                 return ParserResult::Error(Self::Error::InvalidParameters(command_name.to_string()))
@@ -288,17 +286,20 @@ impl Parser for ContentParser {
         if self.capture_level > 0 {
             if slice.starts_with("}") {
                 self.capture_level -= 1;
-                size += "}".len();
-                if let Some(capture) = COMMAND_END_REGEX.captures(&slice["}".len()..]) {
-                    size += capture.get(0).unwrap().as_str().len();
+                slice = &slice["}".len()..];
+                if let Some(capture) = COMMAND_END_REGEX.captures(slice) {
+                    let size = capture.get(0).unwrap().as_str().len();
+                    slice = &slice[size..];
                 }
-                return ParserResult::Some(Self::Token::BlockEnd, size);
+                let final_size = string.len() - slice.len();
+                return ParserResult::Some(Self::Token::BlockEnd, final_size);
             }
             else {
                 return ParserResult::Error(Self::Error::MissingClosingBrace);
             }
         }
-        return ParserResult::End(size);
+        let final_size = string.len() - slice.len();
+        return ParserResult::End(final_size);
     }
 }
 
