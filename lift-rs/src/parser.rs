@@ -233,11 +233,10 @@ impl Parser for ContentParser {
             size += text_size;
             slice = &slice[text_size..];
         }
-
         if let Some(capture) = COMMAND_REGEX.captures(slice) {
             let command_name = capture.name("name").unwrap().as_str();
             size += capture.get(0).unwrap().as_str().len();
-            slice = &slice[size..];
+            slice = &string[size..];
 
             let expect: Vec<Expect> = match command_name {
                 "link" => vec![
