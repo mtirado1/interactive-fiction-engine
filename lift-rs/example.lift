@@ -1,9 +1,0 @@
-# test
-@set tool  "potato chip"
-@if tool == "potato chip" {
-	@link eat your potato chip {
-		You hold up the single potato chip you brought into this house, and put it in your mouth. The potato chip makes a satisfying crunch as you chew on it.
-		You no longer have your potato chip.
-		@set tool = null
-	}
-}
