@@ -1,9 +1,11 @@
 // Lift Interpreter Core
+use std::fmt;
 use std::collections::HashMap;
 use std::rc::Rc;
 use regex::Regex;
 
 use crate::content::{Page, Content, Action};
+use crate::parser::ContentError;
 use crate::expression::StateManager;
 use crate::value::Value;
 
@@ -48,8 +50,20 @@ pub struct Story {
     pages: HashMap<String, Page>
 }
 
+pub struct StoryError {
+    pub error: ContentError,
+    pub page: String,
+    pub line: usize
+}
+
+impl fmt::Display for StoryError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Parsing error on page {}, line {}:\n{}", self.page, self.line, self.error)
+    }
+}
+
 impl Story {
-    pub fn new(source: &str) -> Self {
+    pub fn new(source: &str) -> Result<Self, StoryError> {
         let header_regex = Regex::new(r"^#+ (?P<title>.+)").unwrap();
 
         let mut pages = HashMap::<String, Page>::new();
@@ -57,15 +71,14 @@ impl Story {
         let mut first_page: Option<&str> = None;
         let mut current_page: Option<&str> = None;
 
-        for line in source.lines() {
-            let cap = header_regex.captures(line);
-
-            if let Some(capture) = cap {
+        let mut page_line: usize = 1;
+        for (line_number, line) in source.lines().enumerate() {
+            if let Some(capture) = header_regex.captures(line) {
                 if let Some(title) = current_page {
-                    let page = Page::parse(title, &content_acumulator);
+                    let page = Self::parse_page(page_line, title, &content_acumulator)?;
                     pages.insert(title.to_string(), page);
-                    content_acumulator = "".to_string();
                 }
+                page_line = line_number + 1;
                 let title = capture.name("title").unwrap().as_str().trim();
                 if first_page == None {
                     first_page = current_page
@@ -76,13 +89,21 @@ impl Story {
             }
         }
         if let Some(title) = current_page {
-            let page = Page::parse(title, &content_acumulator);
+            let page = Self::parse_page(page_line, title, &content_acumulator)?;
             pages.insert(title.to_string(), page);
             if first_page == None {
                 first_page = Some(title)
             }
         }
-        Story {pages, first_page: first_page.unwrap_or("").to_string()}
+        Ok(Story {pages, first_page: first_page.unwrap_or("").to_string()})
+    }
+
+    fn parse_page(line_number: usize, title: &str, content: &str) -> Result<Page, StoryError> {
+        Page::parse(title, content).map_err(|(size, error)| StoryError {
+            error,
+            page: title.to_string(),
+            line: line_number + content[..size].lines().count()
+        })
     }
 
     fn get_page(&self, title: &str) -> Option<&Page> {

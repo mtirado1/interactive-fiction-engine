@@ -5,7 +5,6 @@ mod content;
 mod story;
 
 use story::{Interpreter, Element, Story};
-
 use std::fs;
 use std::process;
 use std::env;
@@ -122,9 +121,15 @@ fn create_story(files: &[String]) -> Story {
         if let Ok(content) = fs::read_to_string(file) {
             source.push_str(&content);
         } else {
-            println!("Error while reading file '{}'", file);
+            eprintln!("Error while reading file '{}'", file);
             process::exit(0);
         }
     }
-    return Story::new(&source);
+    match Story::new(&source) {
+        Ok(story) => return story,
+        Err(error) => {
+            eprintln!("{}", error);
+            process::exit(1);
+        }
+    }
 }

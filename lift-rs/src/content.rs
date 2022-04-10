@@ -1,6 +1,6 @@
 // Content Parser
 use crate::expression::*;
-use crate::parser::{ContentParser, Parser, ContentToken, Params};
+use crate::parser::{ContentParser, Parser, ContentToken, Params, ContentError};
 
 pub enum Content {
     Text(TextContent),
@@ -37,14 +37,14 @@ pub struct Page {
 }
 
 impl Page {
-    pub fn parse(title: &str, source: &str) -> Page {
+    pub fn parse(title: &str, source: &str) -> Result<Page, (usize, ContentError)> {
         let mut content_stack: Vec<Vec<Content>> = vec![vec![]];
         let mut command_stack: Vec<(String, Vec<Params>)> = vec![];
         let mut actions: Vec<Vec<Content>> = vec![];
         let mut parser = ContentParser::new();
         let (tokens, size, error_option) = parser.parse(source);
         if let Some(error) = error_option {
-            println!("Parsing error on page '{}': {}", title, error.message());
+            return Err((size, error));
         }
 
         for token in tokens {
@@ -68,7 +68,7 @@ impl Page {
                 }
             }
         }
-        return Page { content: content_stack.pop().unwrap(), actions };
+        return Ok(Page { content: content_stack.pop().unwrap(), actions });
     }
 }
 

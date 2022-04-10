@@ -1,4 +1,5 @@
 use regex::Regex;
+use std::fmt;
 use lazy_static::lazy_static;
 use crate::content::{TextElement, TextContent};
 use crate::expression::{ExpressionParser, Expression};
@@ -164,18 +165,18 @@ impl Parser for TextParser {
     }
 }
 
-pub enum ContentParserError {
+pub enum ContentError {
     InvalidCommand(String),
     InvalidParameters(String),
     MissingClosingBrace
 }
 
-impl ContentParserError {
-    pub fn message(&self) -> String {
+impl fmt::Display for ContentError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ContentParserError::InvalidCommand(cmd) => format!("Invalid command: @{}", cmd),
-            ContentParserError::InvalidParameters(cmd) => format!("Invalid parameters for command: @{}", cmd),
-            ContentParserError::MissingClosingBrace => "Missing closing brace".to_string()
+            ContentError::InvalidCommand(cmd) => write!(f, "Invalid command: @{}", cmd),
+            ContentError::InvalidParameters(cmd) => write!(f, "Invalid parameters for command: @{}", cmd),
+            ContentError::MissingClosingBrace => write!(f, "Missing closing brace")
         }
     }
 }
@@ -198,11 +199,14 @@ pub enum ContentToken {
 
 impl Parser for ContentParser {
     type Token = ContentToken;
-    type Error = ContentParserError;
+    type Error = ContentError;
     
     fn next(&mut self, string: &str) -> ParserResult<Self::Token, Self::Error, usize> {
         if string.is_empty() {
-            return ParserResult::End(0);
+            return match self.capture_level {
+                0 => ParserResult::End(0),
+                _ => ParserResult::Error(Self::Error::MissingClosingBrace)
+            }
         }
         lazy_static! {
             static ref COMMENT_REGEX: Regex = Regex::new(r"^@@.*\n").unwrap();
@@ -283,23 +287,17 @@ impl Parser for ContentParser {
             }
         }
 
-        if self.capture_level > 0 {
-            if slice.starts_with("}") {
-                self.capture_level -= 1;
-                slice = &slice["}".len()..];
-                if let Some(capture) = COMMAND_END_REGEX.captures(slice) {
-                    let size = capture.get(0).unwrap().as_str().len();
-                    slice = &slice[size..];
-                }
-                let final_size = string.len() - slice.len();
-                return ParserResult::Some(Self::Token::BlockEnd, final_size);
+        if self.capture_level > 0 && slice.starts_with("}") {
+            self.capture_level -= 1;
+            slice = &slice["}".len()..];
+            if let Some(capture) = COMMAND_END_REGEX.captures(slice) {
+                let size = capture.get(0).unwrap().as_str().len();
+                slice = &slice[size..];
             }
-            else {
-                return ParserResult::Error(Self::Error::MissingClosingBrace);
-            }
+            let final_size = string.len() - slice.len();
+            return ParserResult::Some(Self::Token::BlockEnd, final_size);
         }
-        let final_size = string.len() - slice.len();
-        return ParserResult::End(final_size);
+        return ParserResult::End(0);
     }
 }
 
