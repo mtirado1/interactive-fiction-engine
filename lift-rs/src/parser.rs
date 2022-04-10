@@ -247,6 +247,9 @@ impl Parser for ContentParser {
                         vec![Expect::Text, Expect::Block]
                     ])
                 ],
+                "input" => vec![
+                    Expect::Variable, Expect::Block
+                ],
                 "set" | "setlocal" => vec![
                     Expect::Indices, Expect::string("="), Expect::Expression
                 ],

@@ -5,6 +5,7 @@ mod content;
 mod story;
 
 use story::{Interpreter, Element, Story};
+use value::Value;
 use std::fs;
 use std::process;
 use std::env;
@@ -12,7 +13,8 @@ use std::io;
 use std::io::Write;
 
 enum UserActions {
-    Tap(usize)
+    Tap(usize),
+    Prompt(usize)
 }
 
 fn prompt(interpreter: &mut Interpreter, choices: Vec<UserActions>) {
@@ -25,7 +27,17 @@ fn prompt(interpreter: &mut Interpreter, choices: Vec<UserActions>) {
     if let Ok(choice) = input.trim().parse::<u32>() {
         if let Some(action) = choices.get((choice - 1) as usize) {
             match action {
-                UserActions::Tap(i) => interpreter.send(*i)
+                UserActions::Tap(i) => interpreter.send(*i, Value::Null),
+                UserActions::Prompt(i) => {
+                    let mut user_input = String::new();
+                    print!(" -> ");
+                    let _ = io::stdout().flush();
+                    io::stdin()
+                        .read_line(&mut user_input)
+                        .expect("Failed to read input");
+                    user_input = user_input.trim().to_string();
+                    interpreter.send(*i, Value::Text(user_input));
+                }
             }
         }
         else {
@@ -94,6 +106,17 @@ fn render(interpreter: &Interpreter) -> (String, Vec<UserActions>) {
                 ret += &format!("{}. [{}]", input_id, title);
                 input_id += 1;
                 choices.push(UserActions::Tap(index));
+            }
+            Element::Input(_, _, _) => {
+                match last {
+                    Text => ret += "\n",
+                    Break => ret += "\n\n",
+                    _ => {}
+                };
+                last = Text;
+                ret += &format!("{}. [__________]", input_id);
+                input_id += 1;
+                choices.push(UserActions::Prompt(index));
             }
             Element::Error(e) => ret += &format!("ERROR: {}\n", e),
         }

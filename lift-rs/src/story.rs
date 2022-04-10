@@ -15,6 +15,7 @@ pub enum Element {
     Link(String, String),
     ContentLink(String, String, usize),
     JumpLink(String, String, String, usize),
+    Input(String, String, usize),
     Error(String)
 }
 
@@ -77,6 +78,7 @@ impl Story {
                 if let Some(title) = current_page {
                     let page = Self::parse_page(page_line, title, &content_acumulator)?;
                     pages.insert(title.to_string(), page);
+                    content_acumulator = "".to_string();
                 }
                 page_line = line_number + 1;
                 let title = capture.name("title").unwrap().as_str().trim();
@@ -205,7 +207,7 @@ impl Interpreter {
         }
     }
 
-    pub fn send(&mut self, index: usize) {
+    pub fn send(&mut self, index: usize, value: Value) {
         let element: Option<Element> = self.output.get(index).cloned();
         if let Some(Element::Link(_, destination)) = element {
             self.state.current_page = destination.to_string();
@@ -232,6 +234,22 @@ impl Interpreter {
                 self.state.current_page = destination.to_string();
                 self.play();
                 self.output.splice(0..0, result.output);
+            }
+        }
+        else if let Some(Element::Input(variable, page, action_index)) = element {
+            if let Some(content) = self.story.clone().get_action(&page, action_index) {
+                self.state.set_local(&variable, value);
+                let result = self.eval(content);
+                 match result.action {
+                    StoryAction::Halt => {
+                        self.output.splice(index..index+1, result.output);
+                    }
+                    StoryAction::Goto(p) => {
+                        self.state.current_page = p;
+                        self.play();
+                        self.output.splice(0..0, result.output);
+                    }
+                }               
             }
         }
     }
@@ -279,6 +297,10 @@ impl Interpreter {
                             Element::JumpLink(title.eval(&self.state), destination.eval(&self.state), page.to_string(), *action) 
                         }
                     };
+                    result.push_element(element);
+                }
+                Content::Input{variable, page, action} => {
+                    let element = Element::Input(variable.to_string(), page.to_string(), *action);
                     result.push_element(element);
                 }
                 Content::Goto(page) => {result.action = StoryAction::Goto(page.eval(&self.state))},

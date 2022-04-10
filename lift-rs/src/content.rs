@@ -5,6 +5,7 @@ use crate::parser::{ContentParser, Parser, ContentToken, Params, ContentError};
 pub enum Content {
     Text(TextContent),
     Link(Action),
+    Input { variable: String, page: String, action: usize },
     Set { local: bool, variable: String, indices: Vec<Expression>, expression: Expression },
     If { expression: Expression, content: Vec<Content> },
     ElseIf { expression: Expression, content: Vec<Content> },
@@ -103,6 +104,11 @@ impl Content {
             }
             ("link", Args::Two(Params::Text(title), Params::Text(destination)), None) => {
                 Content::Link(Action::Normal{title, destination})
+            }
+            ("input", Args::One(Params::Variable(variable)), Some(content)) => {
+                let action = actions.len();
+                actions.push(content);
+                Content::Input{variable, page: page.to_string(), action}
             }
             ("link", Args::One(Params::Text(title)), Some(content)) => {
                let action = actions.len();
