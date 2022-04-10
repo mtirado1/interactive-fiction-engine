@@ -281,6 +281,22 @@ pub mod operator {
 impl Value {
     pub fn eval_function(name: &str, values: Vec<Value>) -> Value {
         match name {
+            "int" => {
+                match values.get(0) {
+                    Some(Text(s)) => s.parse::<i64>().map_or(Null, |i| Integer(i)),
+                    Some(Integer(i)) => Integer(*i),
+                    Some(Float(f)) => Integer(*f as i64),
+                    _ => Null
+                }
+            }
+            "float" => {
+                match values.get(0) {
+                    Some(Text(s)) => s.parse::<f64>().map_or(Null, |i| Float(i)),
+                    Some(Integer(i)) => Float(*i as f64),
+                    Some(Float(f)) => Float(*f),
+                    _ => Null
+                }
+            }
             "len" => {
                 match values.get(0) {
                     Some(Array(a)) => Integer(a.len() as i64),
