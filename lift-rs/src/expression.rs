@@ -9,7 +9,7 @@ pub trait StateManager {
     fn get(&self, variable: &str) -> Option<&Value>;
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum Operator {
     Add, Sub, Mul, Div, Rem, Exp,
     And, Or,
@@ -46,29 +46,29 @@ impl Operator {
 
     fn apply(&self, a: Value, b: Value) -> Value {
         match self {
-            Operator::Exp => a.pow(&b),
-            Operator::Add => a + b,
-            Operator::Mul => a * b,
-            Operator::Sub => a - b,
-            Operator::Div => a / b,
-            Operator::Rem => a % b,
-            Operator::And => Boolean(a.is_true() & b.is_true()),
-            Operator::Or => Boolean(a.is_true() | b.is_true()),
-            Operator::Contains => operator::contains(&a, &b),
-            Operator::In => operator::contains(&b, &a),
-            Operator::Index => operator::index(&a, &b),
-            Operator::Equal => Boolean(a == b),
-            Operator::NotEqual => Boolean(a != b),
-            Operator::Greater => comparison::gt(&a, &b),
-            Operator::GreaterOrEqual => comparison::gte(&a, &b),
-            Operator::Less => comparison::lt(&a, &b),
-            Operator::LessOrEqual => comparison::lte(&a, &b),
-            Operator::Coalesce => a.coalesce(&b),
+            Exp => a.pow(&b),
+            Add => a + b,
+            Mul => a * b,
+            Sub => a - b,
+            Div => a / b,
+            Rem => a % b,
+            And => Boolean(a.is_true() & b.is_true()),
+            Or => Boolean(a.is_true() | b.is_true()),
+            Contains => operator::contains(&a, &b),
+            In => operator::contains(&b, &a),
+            Index => operator::index(&a, &b),
+            Equal => Boolean(a == b),
+            NotEqual => Boolean(a != b),
+            Greater => comparison::gt(&a, &b),
+            GreaterOrEqual => comparison::gte(&a, &b),
+            Less => comparison::lt(&a, &b),
+            LessOrEqual => comparison::lte(&a, &b),
+            Coalesce => a.coalesce(&b),
         }
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum UnaryOperator {
     Minus, Plus, Not
 }
@@ -83,9 +83,9 @@ impl UnaryOperator {
 
     fn apply(&self, a: Value) -> Value {
         match self {
-            UnaryOperator::Minus => -a,
-            UnaryOperator::Not => Boolean(!a.is_true()),
-            UnaryOperator::Plus => a,
+            Minus => -a,
+            Not => Boolean(!a.is_true()),
+            Plus => a,
         }
     }
 }
@@ -168,17 +168,12 @@ impl Expression {
 }
 
 // Parser
-
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum ParserToken {
-    LeftParen,
-    RightParen,
-    ArrayStart,
-    ArrayEnd,
-    ObjectStart,
-    ObjectEnd,
-    IndexStart,
-    IndexEnd,
+    LeftParen,   RightParen,
+    ArrayStart,  ArrayEnd,
+    ObjectStart, ObjectEnd,
+    IndexStart,  IndexEnd,
     Separator,
     ObjectSeparator,
     Function(String),
@@ -286,6 +281,13 @@ impl ExpressionParser {
         return Some((variable_name, expression_stack));
     }
 
+    fn pop_while<F>(operator_stack: &mut Vec<ParserToken>, expression: &mut Vec<ExpressionToken>, condition: F) where F: Fn(&ParserToken) -> bool {
+        while operator_stack.last().map_or(false, &condition) {
+            let operator = operator_stack.pop().unwrap();
+            expression.push(operator.to_expression_operator().unwrap());
+        }
+    }
+
     fn convert_to_postfix(tokens: Vec<ParserToken>) -> Result<Expression, ParsingError> {
         let mut operator_stack = Vec::<ParserToken>::new();
         let mut function_stack = Vec::<(usize, ListType)>::new();
@@ -299,13 +301,7 @@ impl ExpressionParser {
                     operator_stack.push(token);
                 }
                 ParserToken::RightParen => {
-                    while operator_stack.last().is_some() {
-                        if let Some(ParserToken::LeftParen) = operator_stack.last() {
-                            break;
-                        }
-                        let operator = operator_stack.pop().unwrap();
-                        return_expression.push(operator.to_expression_operator().unwrap());
-                    }
+                    Self::pop_while(&mut operator_stack, &mut return_expression, |x| x != &ParserToken::LeftParen);
                     if let None = operator_stack.pop() {
                         return Err(ParsingError::MismatchedParentheses);
                     }
@@ -321,12 +317,7 @@ impl ExpressionParser {
                 ParserToken::ObjectSeparator => {
                 }
                 ParserToken::Separator => {
-                    loop {
-                        if operator_stack.last().map_or(false, |t| t.is_operator()) {
-                            return_expression.push(operator_stack.pop().unwrap().to_expression_operator().unwrap());
-                        }
-                        else { break }
-                    }
+                    Self::pop_while(&mut operator_stack, &mut return_expression, |x| x.is_operator());
                     if let Some((arg_count, list_type)) = function_stack.pop() {
                         function_stack.push((arg_count + 1, list_type));
                     }
@@ -343,13 +334,7 @@ impl ExpressionParser {
                     function_stack.push((1, ListType::Object));
                 }
                 ParserToken::ObjectEnd => {
-                    while !operator_stack.is_empty() {
-                        if let Some(ParserToken::ObjectStart) = operator_stack.last() {
-                            break;
-                        }
-                        let operator = operator_stack.pop().unwrap();
-                        return_expression.push(operator.to_expression_operator().unwrap());
-                    }
+                    Self::pop_while(&mut operator_stack, &mut return_expression, |x| x != &ParserToken::ObjectStart);
                     if let Some(ParserToken::ObjectStart) = operator_stack.pop() {
                         if let Some((mut arg_count, ListType::Object)) = function_stack.pop() {
                             if let Some(ParserToken::ObjectStart) = previous_token {
@@ -360,13 +345,7 @@ impl ExpressionParser {
                     }
                 }
                 ParserToken::ArrayEnd => {
-                    while !operator_stack.is_empty() {
-                        if let Some(ParserToken::ArrayStart) = operator_stack.last() {
-                            break;
-                        }
-                        let operator = operator_stack.pop().unwrap();
-                        return_expression.push(operator.to_expression_operator().unwrap());
-                    }
+                    Self::pop_while(&mut operator_stack, &mut return_expression, |x| x != &ParserToken::ArrayStart);
                     if let Some(ParserToken::ArrayStart) = operator_stack.pop() {
                         if let Some((mut arg_count, ListType::Array)) = function_stack.pop() {
                             if let Some(ParserToken::ArrayStart) = previous_token {
@@ -380,13 +359,7 @@ impl ExpressionParser {
                     }
                 }
                 ParserToken::IndexEnd => {
-                    while !operator_stack.is_empty() {
-                        if let Some(ParserToken::IndexStart) = operator_stack.last() {
-                            break;
-                        }
-                        let operator = operator_stack.pop().unwrap();
-                        return_expression.push(operator.to_expression_operator().unwrap());
-                    }
+                    Self::pop_while(&mut operator_stack, &mut return_expression, |x| x != &ParserToken::IndexStart);
                     if let Some(ParserToken::IndexStart) = operator_stack.pop() {
                         return_expression.push(ExpressionToken::Operator(Operator::Index));
                     }
@@ -402,22 +375,15 @@ impl ExpressionParser {
                     operator_stack.push(token);
                 }
                 ParserToken::Operator(ref op) => {
-                    let current_precedence = op.precedence();
-                    let mut last_precedence;
-                    while operator_stack.last().is_some() {
-                        let operator = operator_stack.last().unwrap();
-                        match operator {
-                            ParserToken::Operator(op) => last_precedence = op.precedence(),
-                            ParserToken::UnaryOperator(op) => last_precedence = op.precedence(),
-                            _ => break
+                    let precedence = op.precedence();
+                    Self::pop_while(&mut operator_stack, &mut return_expression, |last| -> bool {
+                        let last_precedence = match last {
+                            ParserToken::Operator(op) => op.precedence(),
+                            ParserToken::UnaryOperator(op) => op.precedence(),
+                            _ => return false
                         };
-                        if (last_precedence > current_precedence) | ((last_precedence == current_precedence) & op.is_left_associative()) {
-                            return_expression.push(operator_stack.pop().unwrap().to_expression_operator().unwrap());
-                        }
-                        else {
-                            break;
-                        }
-                    }
+                        return (last_precedence > precedence) || ((last_precedence == precedence) && op.is_left_associative());
+                    });
                     operator_stack.push(token);
                 }
                 ParserToken::ObjectIndex(index) => {
@@ -478,7 +444,7 @@ impl Parser for ExpressionParser {
         static ref BOOLEAN_REGEX: Regex = Regex::new(r"^(true|false)([^\w]+|$)").unwrap();
         static ref STRING_REGEX: Regex = Regex::new(r#"^("((\\.|[^\\\n"])*)")"#).unwrap();
         static ref FLOAT_REGEX: Regex = Regex::new(r"^(\d+(\.\d+[Ee][+-]?\d+|[Ee][+-]?\d+|\.\d+))").unwrap();
-        static ref INTEGER_REGEX: Regex = Regex::new(r"^(\d+)").unwrap();
+        static ref INTEGER_REGEX: Regex = Regex::new(r"^\d+").unwrap();
         static ref NULL_REGEX: Regex = Regex::new(r"^(null)([^\w]+|$)").unwrap();
 
         static ref CONTAINS_REGEX: Regex = Regex::new(r"(contains)[^\w]+").unwrap();
