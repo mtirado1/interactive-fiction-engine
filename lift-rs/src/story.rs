@@ -39,7 +39,7 @@ impl StoryResult {
         self.action = result.action;
     }
 
-    fn push_element(&mut self, element: Element) {
+    fn push(&mut self, element: Element) {
         self.output.push(element);
     }
 }
@@ -207,6 +207,19 @@ impl Interpreter {
         }
     }
 
+    fn process_result(&mut self, result: StoryResult, index: usize) {
+        match result.action {
+            StoryAction::Halt => {
+                self.output.splice(index..index+1, result.output);
+            }
+            StoryAction::Goto(page) => {
+                self.state.current_page = page;
+                self.play();
+                self.output.splice(0..0, result.output);
+            }
+        }
+    }
+
     pub fn send(&mut self, index: usize, value: Value) {
         let element: Option<Element> = self.output.get(index).cloned();
         if let Some(Element::Link(_, destination)) = element {
@@ -216,40 +229,21 @@ impl Interpreter {
         else if let Some(Element::ContentLink(_, page, action_index)) = element {
             if let Some(content) = self.story.clone().get_action(&page, action_index) {
                 let result = self.eval(content);
-                match result.action {
-                    StoryAction::Halt => {
-                        self.output.splice(index..index+1, result.output);
-                    }
-                    StoryAction::Goto(p) => {
-                        self.state.current_page = p;
-                        self.play();
-                        self.output.splice(0..0, result.output);
-                    }
-                }
+                self.process_result(result, index);
             }
         }
         else if let Some(Element::JumpLink(_, destination, page, action_index)) = element {
             if let Some(content) = self.story.clone().get_action(&page, action_index) {
-                let result = self.eval(content);
-                self.state.current_page = destination.to_string();
-                self.play();
-                self.output.splice(0..0, result.output);
+                let mut result = self.eval(content);
+                result.action = StoryAction::Goto(destination.to_string());
+                self.process_result(result, index);
             }
         }
         else if let Some(Element::Input(variable, page, action_index)) = element {
             if let Some(content) = self.story.clone().get_action(&page, action_index) {
                 self.state.set_local(&variable, value);
                 let result = self.eval(content);
-                 match result.action {
-                    StoryAction::Halt => {
-                        self.output.splice(index..index+1, result.output);
-                    }
-                    StoryAction::Goto(p) => {
-                        self.state.current_page = p;
-                        self.play();
-                        self.output.splice(0..0, result.output);
-                    }
-                }               
+                self.process_result(result, index);
             }
         }
     }
@@ -284,7 +278,7 @@ impl Interpreter {
         let mut if_action: Option<bool> = None;
         for element in content.iter() {
             match element {
-                Content::Text(s) => result.push_element(Element::Text(s.eval(&self.state))),
+                Content::Text(s) => result.push(Element::Text(s.eval(&self.state))),
                 Content::Link(link) => {
                     let element = match link {
                         Action::Normal{title, destination} => {
@@ -297,11 +291,11 @@ impl Interpreter {
                             Element::JumpLink(title.eval(&self.state), destination.eval(&self.state), page.to_string(), *action) 
                         }
                     };
-                    result.push_element(element);
+                    result.push(element);
                 }
                 Content::Input{variable, page, action} => {
                     let element = Element::Input(variable.to_string(), page.to_string(), *action);
-                    result.push_element(element);
+                    result.push(element);
                 }
                 Content::Goto(page) => {result.action = StoryAction::Goto(page.eval(&self.state))},
                 Content::Import(page_title) => {
@@ -345,29 +339,15 @@ impl Interpreter {
                 }
                 Content::For { index, variable, expression, content} => {
                     let iterator_value = expression.eval(&self.state);
-                    if let Value::Array(arr) = iterator_value {
-                        for (i, value) in arr.iter().enumerate() {
-                            if let Some(index) = index {
-                                self.state.set_local(index, Value::Integer(i as i64));
-                            }
-                            self.state.set_local(variable, value.clone());
-                            let content_result = self.eval(content);
-                            result.combine(content_result);
-                            if let StoryAction::Goto(_) = result.action {
-                                break;
-                            }
+                    for (i, value) in iterator_value.iter() {
+                        if let Some(index) = index {
+                            self.state.set_local(index, i);
                         }
-                    } else if let Value::Object(obj) = iterator_value {
-                        for (key, value) in obj {
-                            if let Some(index) = index {
-                                self.state.set_local(index, Value::Text(key));
-                            }
-                            self.state.set_local(variable, value);
-                            let content_result = self.eval(content);
-                            result.combine(content_result);
-                            if let StoryAction::Goto(_) = result.action {
-                                break;
-                            }
+                        self.state.set_local(variable, value);
+                        let content_result = self.eval(content);
+                        result.combine(content_result);
+                        if let StoryAction::Goto(_) = result.action {
+                            break;
                         }
                     }
                 }
@@ -380,7 +360,7 @@ impl Interpreter {
                         }
                     }
                 }
-                Content::Error(e) => result.push_element(Element::Error(e.to_string()))
+                Content::Error(e) => result.push(Element::Error(e.to_string()))
             }
             if let StoryAction::Goto(_) = result.action {
                 return result;

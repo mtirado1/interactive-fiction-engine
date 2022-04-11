@@ -113,7 +113,17 @@ impl Value {
         }
         return Some(reference);
     }
+
+    pub fn iter(&self) -> Vec<(Value, Value)> {
+        match self {
+            Array(arr) => arr.iter().enumerate().map(|(index, value)| (Integer(index as i64), value.clone())).collect(),
+            Text(s) => s.chars().enumerate().map(|(index, value)| (Integer(index as i64), Text(value.to_string()))).collect(),
+            Object(o) => o.iter().map(|(key, value)| (Value::Text(key.to_string()), value.clone())).collect(),
+            _ => vec![]
+        }
+    }
 }
+
 
 impl ops::Neg for Value {
     type Output = Value;
