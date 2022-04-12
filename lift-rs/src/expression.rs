@@ -295,7 +295,7 @@ impl ExpressionParser {
         for token_reference in tokens.iter() {
             let token = token_reference.clone();
             match token {
-                ParserToken::LeftParen | ParserToken::IndexStart => {
+                ParserToken::LeftParen | ParserToken::IndexStart | ParserToken::UnaryOperator(_) => {
                     operator_stack.push(token);
                 }
                 ParserToken::RightParen => {
@@ -368,9 +368,6 @@ impl ExpressionParser {
                 ParserToken::Function(name) => {
                     let list = (1, ListType::Function(name));
                     function_stack.push(list);
-                }
-                ParserToken::UnaryOperator(_) => {
-                    operator_stack.push(token);
                 }
                 ParserToken::Operator(ref op) => {
                     let precedence = op.precedence();
@@ -652,6 +649,10 @@ impl Parser for ExpressionParser {
 
         match (self.last.as_ref(), token.as_ref()) {
             (None, Some(ParserToken::Operator(_)))
+            | (Some(ParserToken::ObjectIndex(_)), Some(ParserToken::ObjectStart))
+            | (Some(ParserToken::ObjectIndex(_)), Some(ParserToken::ArrayStart))
+            | (Some(ParserToken::ObjectIndex(_)), Some(ParserToken::Constant(_)))
+            | (Some(ParserToken::ObjectIndex(_)), Some(ParserToken::Variable(_)))
             | (Some(ParserToken::IndexEnd), Some(ParserToken::ObjectStart))
             | (Some(ParserToken::RightParen), Some(ParserToken::LeftParen))
             | (Some(ParserToken::RightParen), Some(ParserToken::ObjectStart))

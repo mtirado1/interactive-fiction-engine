@@ -140,6 +140,9 @@ impl Parser for TextParser {
                     consumed_size += '$'.len_utf8();
                 }
             }
+            else if !self.expects.is_empty() && string[consumed_size..].starts_with(&self.expects) {
+                return Self::literal_or_none(elements, literal, consumed_size);
+            }
             else if c == '@' {
                 if let Some(_) = COMMAND_REGEX.captures(chars.as_str()) {
                     return Self::literal_or_none(elements, literal, consumed_size);
@@ -152,9 +155,6 @@ impl Parser for TextParser {
             else if c == '\n' {
                 consumed_size += '\n'.len_utf8();
                 return Self::literal(elements, literal, consumed_size);
-            }
-            else if !self.expects.is_empty() && string[consumed_size..].starts_with(&self.expects) {
-                return Self::literal_or_none(elements, literal, consumed_size);
             }
             else {
                 literal.push(c);
@@ -355,6 +355,7 @@ impl Params {
                     let expects = match parameters.get(index + 1) {
                         Some(Expect::Block) => "{",
                         Some(Expect::Prefix(s)) => s,
+                        None => "\n",
                         _ => expect_text
                     };
 
@@ -374,7 +375,7 @@ impl Params {
                 Expect::Indices => {
                     let mut parser = ExpressionParser::new();
                     let (tokens, size, error) = parser.parse(slice);
-					if error.is_some() { return None }
+                    if error.is_some() { return None }
                     let (variable, indices) = ExpressionParser::parse_indices(tokens)?;
                     *slice = &slice[size..];
                     response.push(Params::Indices(variable, indices));
