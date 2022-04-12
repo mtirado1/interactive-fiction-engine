@@ -225,13 +225,11 @@ pub struct ExpressionParser {
 
 impl ExpressionParser {
     fn get_token(&mut self, regex: &Regex, search: &str) -> Option<String> {
-        if let Some(capture) = regex.captures(search) {
-            // Consume the entire regex match or only the first capture group.
-            let token_string = capture.get(1).unwrap_or(capture.get(0).unwrap()).as_str();
-            self.size += token_string.len();
-            return Some(token_string.to_string());
-        }
-        return None;
+        let capture = regex.captures(search)?;
+        // Consume the entire regex match or only the first capture group.
+        let token_string = capture.get(1).unwrap_or(capture.get(0).unwrap()).as_str();
+        self.size += token_string.len();
+        return Some(token_string.to_string());
     }
 
     pub fn new() -> Self {

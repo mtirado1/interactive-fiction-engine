@@ -94,10 +94,7 @@ impl Value {
         for index in references.iter() {
             match (&mut *reference, index) {
                 (Array(arr), Integer(i)) => {
-                    match arr.get_mut(*i as usize) {
-                        Some(next) => reference = next,
-                        None => return None
-                    }
+                    reference = arr.get_mut(*i as usize)?;
                 }
                 (Object(obj), Text(key)) => {
                     if obj.contains_key(key) {

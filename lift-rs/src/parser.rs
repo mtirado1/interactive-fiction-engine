@@ -359,32 +359,25 @@ impl Params {
                     };
 
                     let mut parser = TextParser { expects: expects.to_string() };
-                    let text_token = parser.next(slice);
-                    if let ParserResult::Some(content, size) = text_token {
+                    if let ParserResult::Some(content, size) = parser.next(slice) {
                         *slice = &slice[size..];
                         response.push(Params::Text(content));
                     }
                     else { return None }
                 }
                 Expect::Variable => {
-                    if let Some(capture) = VARIABLE_REGEX.captures(slice) {
-                        let variable = capture.name("variable").unwrap().as_str();
-                        *slice = &slice[variable.len()..];
-                        response.push(Params::Variable(variable.to_string()));
-                    }
-                    else { return None }
+                    let capture = VARIABLE_REGEX.captures(slice)?;
+                    let variable = capture.name("variable").unwrap().as_str();
+                    *slice = &slice[variable.len()..];
+                    response.push(Params::Variable(variable.to_string()));
                 }
                 Expect::Indices => {
                     let mut parser = ExpressionParser::new();
                     let (tokens, size, error) = parser.parse(slice);
-                    if let Some(error) = error {
-                        return None
-                    }
-                    if let Some((variable, indices)) = ExpressionParser::parse_indices(tokens) {
-                        *slice = &slice[size..];
-                        response.push(Params::Indices(variable, indices));
-                    }
-                    else { return None }
+					if error.is_some() { return None }
+                    let (variable, indices) = ExpressionParser::parse_indices(tokens)?;
+                    *slice = &slice[size..];
+                    response.push(Params::Indices(variable, indices));
                 }
                 Expect::Prefix(s) => {
                     if slice.starts_with(s) {

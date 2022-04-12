@@ -113,12 +113,8 @@ impl Story {
     }
 
     fn get_action(&self, title: &str, index: usize) -> Option<&Vec<Content>> {
-        if let Some(page) = self.get_page(title) {
-            if let Some(action) = page.actions.get(index) {
-                return Some(action)
-            }
-        }
-        return None;
+        let page = self.get_page(title)?;
+        return page.actions.get(index);
     }
 }
 
@@ -165,23 +161,20 @@ impl State {
         }
     }
 
-    fn set_local(&mut self, variable: &str, value: Value) {
-        if let Some(state) = self.local.get_mut(&self.current_page) {
-            state.insert(variable.to_string(), value);
-        }
+    fn set_local(&mut self, variable: &str, value: Value) -> Option<()> {
+        let state = self.local.get_mut(&self.current_page)?;
+        state.insert(variable.to_string(), value);
+        return Some(());
     }
 
-    fn set_local_index(&mut self, variable: &str, indices: &Vec<Value>, value: Value) {
+    fn set_local_index(&mut self, variable: &str, indices: &Vec<Value>, value: Value) -> Option<()> {
         if indices.is_empty() {
             return self.set_local(variable, value);
         }
-        if let Some(state) = self.local.get_mut(&self.current_page) {
-            if let Some(var) = state.get_mut(variable) {
-                if let Some(reference) = var.get_mut(indices) {
-                    *reference = value
-                }
-            }
-        }
+        let state = self.local.get_mut(&self.current_page)?;
+        let var = state.get_mut(variable)?;
+        let reference = var.get_mut(indices)?;
+        Some(*reference = value)
     }
 }
 
