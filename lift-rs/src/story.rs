@@ -3,6 +3,7 @@ use std::fmt;
 use std::collections::HashMap;
 use std::rc::Rc;
 use regex::Regex;
+use lazy_static::lazy_static;
 
 use crate::content::{Page, Content, Action};
 use crate::parser::ContentError;
@@ -44,28 +45,32 @@ impl StoryResult {
     }
 }
 
-
-
 pub struct Story {
     first_page: String,
     pages: HashMap<String, Page>
 }
 
-pub struct StoryError {
-    pub error: ContentError,
-    pub page: String,
-    pub line: usize
+pub enum StoryError {
+    Content(ContentError, String, usize),
+    DuplicatePage(String, usize)
 }
 
 impl fmt::Display for StoryError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Parsing error on page {}, line {}:\n{}", self.page, self.line, self.error)
+        match self {
+            StoryError::Content(error, page, line) =>
+                write!(f, "Parsing error on page '{}', line {}:\n{}", page, line, error),
+            StoryError::DuplicatePage(page, line) =>
+                write!(f, "Duplicate page '{}' on line {}", page, line)
+        }
     }
 }
 
 impl Story {
     pub fn new(source: &str) -> Result<Self, StoryError> {
-        let header_regex = Regex::new(r"^#+ (?P<title>.+)").unwrap();
+        lazy_static! {
+            static ref HEADER_REGEX: Regex = Regex::new(r"^#+(?P<title>.+)").unwrap();
+        }
 
         let mut pages = HashMap::<String, Page>::new();
         let mut content_acumulator = "".to_string();
@@ -74,7 +79,7 @@ impl Story {
 
         let mut page_line: usize = 1;
         for (line_number, line) in source.lines().enumerate() {
-            if let Some(capture) = header_regex.captures(line) {
+            if let Some(capture) = HEADER_REGEX.captures(line) {
                 if let Some(title) = current_page {
                     let page = Self::parse_page(page_line, title, &content_acumulator)?;
                     pages.insert(title.to_string(), page);
@@ -82,6 +87,9 @@ impl Story {
                 }
                 page_line = line_number + 1;
                 let title = capture.name("title").unwrap().as_str().trim();
+                if pages.contains_key(title) {
+                    return Err(StoryError::DuplicatePage(title.to_string(), page_line));
+                }
                 if first_page == None {
                     first_page = current_page
                 }
@@ -101,19 +109,15 @@ impl Story {
     }
 
     fn parse_page(line_number: usize, title: &str, content: &str) -> Result<Page, StoryError> {
-        Page::parse(title, content).map_err(|(size, error)| StoryError {
+        Page::parse(title, content).map_err(|(size, error)| StoryError::Content (
             error,
-            page: title.to_string(),
-            line: line_number + content[..size].lines().count()
-        })
-    }
-
-    fn get_page(&self, title: &str) -> Option<&Page> {
-        self.pages.get(title)
+            title.to_string(),
+            line_number + content[..size].lines().count()
+        ))
     }
 
     fn get_action(&self, title: &str, index: usize) -> Option<&Vec<Content>> {
-        let page = self.get_page(title)?;
+        let page = self.pages.get(title)?;
         return page.actions.get(index);
     }
 }
@@ -215,25 +219,26 @@ impl Interpreter {
 
     pub fn send(&mut self, index: usize, value: Value) {
         let element: Option<Element> = self.output.get(index).cloned();
+        let story = &Rc::clone(&self.story);
         if let Some(Element::Link(_, destination)) = element {
             self.state.current_page = destination.to_string();
             self.play();
         }
         else if let Some(Element::ContentLink(_, page, action_index)) = element {
-            if let Some(content) = self.story.clone().get_action(&page, action_index) {
+            if let Some(content) = story.get_action(&page, action_index) {
                 let result = self.eval(content);
                 self.process_result(result, index);
             }
         }
         else if let Some(Element::JumpLink(_, destination, page, action_index)) = element {
-            if let Some(content) = self.story.clone().get_action(&page, action_index) {
+            if let Some(content) = story.get_action(&page, action_index) {
                 let mut result = self.eval(content);
                 result.action = StoryAction::Goto(destination.to_string());
                 self.process_result(result, index);
             }
         }
         else if let Some(Element::Input(variable, page, action_index)) = element {
-            if let Some(content) = self.story.clone().get_action(&page, action_index) {
+            if let Some(content) = story.get_action(&page, action_index) {
                 self.state.set_local(&variable, value);
                 let result = self.eval(content);
                 self.process_result(result, index);
@@ -243,8 +248,9 @@ impl Interpreter {
 
     pub fn play(&mut self) {
         self.output.clear();
+        let story: &Story = &Rc::clone(&self.story);
         loop {
-            if let Some(page) = self.story.clone().get_page(&self.state.current_page) {
+            if let Some(page) = story.pages.get(&self.state.current_page) {
                 let mut result = self.eval(&page.content);
                 self.output.append(&mut result.output);
                 match result.action {
@@ -269,6 +275,7 @@ impl Interpreter {
     fn eval(&mut self, content: &Vec<Content>) -> StoryResult {
         let mut result = StoryResult::new();
         let mut if_action: Option<bool> = None;
+        let story: &Story = &Rc::clone(&self.story);
         for element in content.iter() {
             match element {
                 Content::Text(s) => result.push(Element::Text(s.eval(&self.state))),
@@ -292,7 +299,7 @@ impl Interpreter {
                 }
                 Content::Goto(page) => {result.action = StoryAction::Goto(page.eval(&self.state))},
                 Content::Import(page_title) => {
-                    if let Some(page) = self.story.clone().get_page(&page_title.eval(&self.state)) {
+                    if let Some(page) = story.pages.get(&page_title.eval(&self.state)) {
                         let import_result = self.eval(&page.content);
                         result.combine(import_result);
                     }

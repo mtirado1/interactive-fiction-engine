@@ -1,7 +1,10 @@
 [package]
 name = "lift"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
+description = "A language for interactive fiction texts"
+repository = "https://github.com/mtirado1/lift"
+license = "MIT"
 
 [dependencies]
 regex = "1"

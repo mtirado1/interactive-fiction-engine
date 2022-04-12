@@ -127,7 +127,7 @@ fn render(interpreter: &Interpreter) -> (String, Vec<UserActions>) {
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
-        println!("lift - A Language for Interactive Fiction Texts");
+        println!("lift {} - A Language for Interactive Fiction Texts", env!("CARGO_PKG_VERSION"));
         println!("Usage: {} <FILES>", args[0]);
         process::exit(1);
     }
