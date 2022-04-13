@@ -280,7 +280,7 @@ impl ExpressionParser {
     }
 
     fn pop_while<F>(operator_stack: &mut Vec<ParserToken>, expression: &mut Vec<ExpressionToken>, condition: F) where F: Fn(&ParserToken) -> bool {
-        while operator_stack.last().map_or(false, &condition) {
+        while operator_stack.last().map_or(false, |token| condition(token) && token.is_operator()) {
             let operator = operator_stack.pop().unwrap();
             expression.push(operator.to_expression_operator().unwrap());
         }
@@ -315,7 +315,7 @@ impl ExpressionParser {
                 ParserToken::ObjectSeparator => {
                 }
                 ParserToken::Separator => {
-                    Self::pop_while(&mut operator_stack, &mut return_expression, |x| x.is_operator());
+                    Self::pop_while(&mut operator_stack, &mut return_expression, |x| true);
                     if let Some((arg_count, list_type)) = function_stack.pop() {
                         function_stack.push((arg_count + 1, list_type));
                     }
@@ -394,9 +394,7 @@ impl ExpressionParser {
             }
             previous_token = Some(token_reference.clone());
         }
-        while let Some(token) = operator_stack.pop() {
-            return_expression.push(token.to_expression_operator().unwrap());
-        }
+        Self::pop_while(&mut operator_stack, &mut return_expression, |last| true);
         return Ok(Expression { tokens: return_expression });
     }
 
