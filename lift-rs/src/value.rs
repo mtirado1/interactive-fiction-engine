@@ -304,6 +304,7 @@ impl Value {
                     _ => Null
                 }
             }
+            "str" | "string" => Text(values.get(0).map_or(String::new(), |v| v.to_string())),
             "len" => {
                 match values.get(0) {
                     Some(Array(a)) => Integer(a.len() as i64),

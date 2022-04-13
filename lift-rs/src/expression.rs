@@ -315,7 +315,7 @@ impl ExpressionParser {
                 ParserToken::ObjectSeparator => {
                 }
                 ParserToken::Separator => {
-                    Self::pop_while(&mut operator_stack, &mut return_expression, |x| true);
+                    Self::pop_while(&mut operator_stack, &mut return_expression, |_| true);
                     if let Some((arg_count, list_type)) = function_stack.pop() {
                         function_stack.push((arg_count + 1, list_type));
                     }
@@ -394,7 +394,7 @@ impl ExpressionParser {
             }
             previous_token = Some(token_reference.clone());
         }
-        Self::pop_while(&mut operator_stack, &mut return_expression, |last| true);
+        Self::pop_while(&mut operator_stack, &mut return_expression, |_| true);
         return Ok(Expression { tokens: return_expression });
     }
 

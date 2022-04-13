@@ -20,19 +20,18 @@ pub trait Parser {
     fn parse(&mut self, string: &str) -> (Vec<Self::Token>, usize, Option<Self::Error>) {
         let mut size: usize = 0;
         let mut tokens = Vec::<Self::Token>::new();
-        loop {
+        while &string[size..] != "" {
             match self.next(&string[size..]) {
                 ParserResult::Some(token, len) => {
                     tokens.push(token);
                     size += len;
                 }
-                ParserResult::None(len) => {
-                    size += len;
-                }
+                ParserResult::None(len) => size += len,
                 ParserResult::End(len) => return (tokens, size + len, None),
                 ParserResult::Error(error) => return (tokens, size, Some(error))
             }
         }
+        return (tokens, size, None);
     }
 }
 
