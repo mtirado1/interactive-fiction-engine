@@ -109,6 +109,7 @@ impl Story {
     }
 
     fn parse_page(line_number: usize, title: &str, content: &str) -> Result<Page, StoryError> {
+        println!("'{}'", content);
         Page::parse(title, content).map_err(|(size, error)| StoryError::Content (
             error,
             title.to_string(),
@@ -262,7 +263,7 @@ impl Interpreter {
                 }
             }
             else {
-                self.output.push(Element::Error(format!("Invalid page: {}", self.state.current_page)));
+                self.output.push(Element::Error(format!("Invalid page: '{}'", self.state.current_page)));
                 break;
             }
         }

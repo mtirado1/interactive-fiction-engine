@@ -69,6 +69,9 @@ impl Page {
                 }
             }
         }
+        if command_stack.len() > 0 {
+            return Err((size, ContentError::MissingClosingBrace));
+        }
         return Ok(Page { content: content_stack.pop().unwrap(), actions });
     }
 }

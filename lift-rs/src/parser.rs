@@ -201,12 +201,6 @@ impl Parser for ContentParser {
     type Error = ContentError;
     
     fn next(&mut self, string: &str) -> ParserResult<Self::Token, Self::Error, usize> {
-        if string.is_empty() {
-            return match self.capture_level {
-                0 => ParserResult::End(0),
-                _ => ParserResult::Error(Self::Error::MissingClosingBrace)
-            }
-        }
         lazy_static! {
             static ref COMMENT_REGEX: Regex = Regex::new(r"^@@.*\n").unwrap();
             static ref COMMAND_REGEX: Regex = Regex::new(r"^@(?P<name>[a-z_]+)").unwrap();
@@ -274,14 +268,19 @@ impl Parser for ContentParser {
                 ],
                 _ => return ParserResult::Error(Self::Error::InvalidCommand(command_name.to_string()))
             };
-            if let Some(params) = Params::expect(&mut slice, &expect, &expected_token) {
+            if let Some(params) = Params::expect(&mut slice, &expect, self.capture_level) {
                 if let Some(Params::Block) = params.last() {
                     self.capture_level += 1;
                 }
-                if let Some(capture) = COMMAND_END_REGEX.captures(slice) {
-                    let size = capture.get(0).unwrap().as_str().len();
-                    slice = &slice[size..];
-                }
+                match params.last() {
+                    Some(Params::Text(_)) => {}
+                    _ => {
+                        if let Some(capture) = COMMAND_END_REGEX.captures(slice) {
+                            let size = capture.get(0).unwrap().as_str().len();
+                            slice = &slice[size..];
+                        }
+                    }
+                };
                 let final_size = string.len() - slice.len();
                 return ParserResult::Some(Self::Token::Command(command_name.to_string(), params), final_size);
             }
@@ -330,7 +329,7 @@ pub enum Params {
 }
 
 impl Params {
-    fn expect(slice: &mut &str, parameters: &Vec<Expect>, expect_text: &str) -> Option<Vec<Params>> {
+    fn expect(slice: &mut &str, parameters: &Vec<Expect>, capture_level: usize) -> Option<Vec<Params>> {
         lazy_static! {
             static ref VARIABLE_REGEX: Regex = Regex::new(r"^(?P<variable>[a-zA-Z_]\w*)").unwrap();
         }
@@ -342,7 +341,7 @@ impl Params {
                     let mut complete = false;
                     for params in params_list {
                         let mut first_pass = *slice;
-                        if let Some(mut sub_response) = Params::expect(&mut first_pass, params, expect_text) {
+                        if let Some(mut sub_response) = Params::expect(&mut first_pass, params, capture_level) {
                             response.append(&mut sub_response);
                             *slice = first_pass;
                             complete = true;
@@ -352,11 +351,11 @@ impl Params {
                     if !complete { return None }
                 }
                 Expect::Text => {
-                    let expects = match parameters.get(index + 1) {
-                        Some(Expect::Block) => "{",
-                        Some(Expect::String(s)) => s,
-                        None => "\n",
-                        _ => expect_text
+                    let expects = match (parameters.get(index + 1), capture_level) {
+                        (Some(Expect::Block), _) => "{",
+                        (Some(Expect::String(s)), _) => s,
+                        (_, 0) => "",
+                        (_, _) => "}"
                     };
 
                     let mut parser = TextParser { expects: expects.to_string() };
