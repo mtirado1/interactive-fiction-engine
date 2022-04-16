@@ -233,6 +233,7 @@ impl Parser for ContentParser {
         else if let ParserResult::None(text_size) = next_token {
             slice = &slice[text_size..];
         }
+
         if let Some(capture) = COMMAND_REGEX.captures(slice) {
             let command_name = capture.name("name").unwrap().as_str();
             let command_size = capture.get(0).unwrap().as_str().len();
@@ -307,7 +308,7 @@ enum Expect {
     Text,
     Variable,
     Indices,
-    Prefix(String),
+    String(String),
     Or(Vec<Vec<Expect>>),
     Expression,
     Block
@@ -315,7 +316,7 @@ enum Expect {
 
 impl Expect {
     fn string(string: &str) -> Self {
-        Self::Prefix(string.to_string())
+        Self::String(string.to_string())
     }
 }
 
@@ -353,7 +354,7 @@ impl Params {
                 Expect::Text => {
                     let expects = match parameters.get(index + 1) {
                         Some(Expect::Block) => "{",
-                        Some(Expect::Prefix(s)) => s,
+                        Some(Expect::String(s)) => s,
                         None => "\n",
                         _ => expect_text
                     };
@@ -379,7 +380,7 @@ impl Params {
                     *slice = &slice[size..];
                     response.push(Params::Indices(variable, indices));
                 }
-                Expect::Prefix(s) => {
+                Expect::String(s) => {
                     if slice.starts_with(s) {
                         *slice = &slice[s.len()..];
                     } 

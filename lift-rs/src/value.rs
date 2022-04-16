@@ -366,6 +366,20 @@ impl Value {
                     _ => Null
                 }
             }
+            "floor" => {
+                match values.get(0) {
+                    Some(Integer(k)) => Integer(*k),
+                    Some(Float(k)) => Integer(k.floor() as i64),
+                    _ => Null
+                }
+            }
+            "ceil" => {
+                match values.get(0) {
+                    Some(Integer(k)) => Integer(*k),
+                    Some(Float(k)) => Integer(k.ceil() as i64),
+                    _ => Null
+                }
+            }
             "abs" => {
                 match values.get(0) {
                     Some(Integer(k)) => Integer(k.abs()),

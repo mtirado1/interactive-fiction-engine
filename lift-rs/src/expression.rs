@@ -171,6 +171,7 @@ impl Expression {
 #[derive(Clone, PartialEq)]
 pub enum ParserToken {
     LeftParen,   RightParen,
+    FunctionStart, FunctionEnd,
     ArrayStart,  ArrayEnd,
     ObjectStart, ObjectEnd,
     IndexStart,  IndexEnd,
@@ -295,7 +296,7 @@ impl ExpressionParser {
         for token_reference in tokens.iter() {
             let token = token_reference.clone();
             match token {
-                ParserToken::LeftParen | ParserToken::IndexStart | ParserToken::UnaryOperator(_) => {
+                ParserToken::LeftParen | ParserToken::FunctionStart | ParserToken::IndexStart | ParserToken::UnaryOperator(_) => {
                     operator_stack.push(token);
                 }
                 ParserToken::RightParen => {
@@ -303,13 +304,17 @@ impl ExpressionParser {
                     if let None = operator_stack.pop() {
                         return Err(ParsingError::MismatchedParentheses);
                     }
-                    if function_stack.last().map_or(false, |x| x.1.is_function()) {
-                        if let Some((mut arg_count, ListType::Function(name))) = function_stack.pop() {
-                            if let Some(ParserToken::LeftParen) = previous_token {
-                                arg_count = 0;
-                            }
-                            return_expression.push(ExpressionToken::Function(name, arg_count));
+                }
+                ParserToken::FunctionEnd => {
+                    Self::pop_while(&mut operator_stack, &mut return_expression, |x| x != &ParserToken::FunctionStart);
+                    if let None = operator_stack.pop() {
+                        return Err(ParsingError::MismatchedParentheses);
+                    }
+                    if let Some((mut arg_count, ListType::Function(name))) = function_stack.pop() {
+                        if let Some(ParserToken::FunctionStart) = previous_token {
+                            arg_count = 0;
                         }
+                        return_expression.push(ExpressionToken::Function(name, arg_count));
                     }
                 }
                 ParserToken::ObjectSeparator => {
@@ -476,12 +481,18 @@ impl Parser for ExpressionParser {
         let slice = &string[size..];
 
         if let Some(_) = self.get_token(&LEFT_PAREN_REGEX, slice) {
-            token = Some(ParserToken::LeftParen);
-            self.token_stack.push(ParserToken::LeftParen);
+            let start = match self.last {
+                Some(ParserToken::Function(_)) => ParserToken::FunctionStart,
+                _ => ParserToken::LeftParen
+            };
+            self.token_stack.push(start.clone());
+            token = Some(start);
         }
         else if let Some(_) = self.get_token(&RIGHT_PAREN_REGEX, slice) {
-            if let Some(ParserToken::LeftParen) = self.token_stack.pop() {
-                token = Some(ParserToken::RightParen);
+            token = match self.token_stack.pop() {
+                Some(ParserToken::LeftParen) => Some(ParserToken::RightParen),
+                Some(ParserToken::FunctionStart) => Some(ParserToken::FunctionEnd),
+                _ => None
             }
         }
         else if let Some(_) = self.get_token(&ARRAY_START_REGEX, slice) {

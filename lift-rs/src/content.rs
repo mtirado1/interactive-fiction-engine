@@ -105,15 +105,15 @@ impl Content {
             ("link", Args::Two(Params::Text(title), Params::Text(destination)), None) => {
                 Content::Link(Action::Normal{title, destination})
             }
-            ("input", Args::One(Params::Variable(variable)), Some(content)) => {
-                let action = actions.len();
-                actions.push(content);
-                Content::Input{variable, page: page.to_string(), action}
-            }
             ("link", Args::One(Params::Text(title)), Some(content)) => {
                let action = actions.len();
                actions.push(content);
                Content::Link(Action::Content{title, page: page.to_string(), action})
+            }
+            ("input", Args::One(Params::Variable(variable)), Some(content)) => {
+                let action = actions.len();
+                actions.push(content);
+                Content::Input{variable, page: page.to_string(), action}
             }
             ("goto", Args::One(Params::Text(page)), None) => Content::Goto(page),
             ("import", Args::One(Params::Text(page)), None) => Content::Import(page),
