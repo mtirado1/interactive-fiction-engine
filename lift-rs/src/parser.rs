@@ -85,22 +85,18 @@ impl Parser for TextParser {
         while let Some(c) = chars.next() {
             if c == '\\' {
                 consumed_size += '\\'.len_utf8();
-                let next = chars.next();
-                let replace = match next {
-                    Some('\n') => ' ',
-                    Some('n') => '\n',
-                    Some(c) => c,
-                    None => '\\'
+                let replace = match chars.as_str().chars().next() {
+                    Some('\n') | None => None,
+                    Some('n') => Some('\n'),
+                    Some(c) => Some(c)
                 };
-                if let Some('\n') = next {
-                    if let Some(capture) = WHITESPACE_REGEX.captures(chars.as_str()) {
-                        let size = capture.get(0).unwrap().as_str().len();
-                        consumed_size += size;
-                        chars = chars.as_str()[size..].chars();
-                    }
+                if let Some(replace_char) = replace {
+                    literal.push(replace_char);
+                    chars.next();
+                    consumed_size += replace_char.len_utf8();
+                } else {
+                    literal.push('\\');
                 }
-                literal.push(replace);
-                consumed_size += replace.len_utf8();
             }
             else if c == '$' {
                 if let Some(capture) = VARIABLE_REGEX.captures(chars.as_str()) {
