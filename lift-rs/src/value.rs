@@ -305,6 +305,18 @@ impl Value {
                 }
             }
             "str" | "string" => Text(values.get(0).map_or(String::new(), |v| v.to_string())),
+            "uppercase" | "upper" => {
+                match values.get(0) {
+                    Some(Text(s)) => Text(s.to_uppercase()),
+                    _ => Null
+                }
+            }
+            "lowercase" | "lower" => {
+                match values.get(0) {
+                    Some(Text(s)) => Text(s.to_lowercase()),
+                    _ => Null
+                }
+            }
             "len" => {
                 match values.get(0) {
                     Some(Array(a)) => Integer(a.len() as i64),

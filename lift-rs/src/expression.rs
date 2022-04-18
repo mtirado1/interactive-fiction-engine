@@ -662,6 +662,8 @@ impl Parser for ExpressionParser {
             | (Some(ParserToken::ObjectIndex(_)), Some(ParserToken::ArrayStart))
             | (Some(ParserToken::ObjectIndex(_)), Some(ParserToken::Constant(_)))
             | (Some(ParserToken::ObjectIndex(_)), Some(ParserToken::Variable(_)))
+            | (Some(ParserToken::FunctionEnd), Some(ParserToken::ObjectStart))
+            | (Some(ParserToken::FunctionEnd), Some(ParserToken::LeftParen))
             | (Some(ParserToken::IndexEnd), Some(ParserToken::ObjectStart))
             | (Some(ParserToken::RightParen), Some(ParserToken::LeftParen))
             | (Some(ParserToken::RightParen), Some(ParserToken::ObjectStart))

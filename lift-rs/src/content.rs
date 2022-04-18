@@ -19,7 +19,6 @@ pub enum Content {
 
 impl Content {
     fn make_error(message: &str) -> Content {
-        println!("{}", message);
         Content::Error(message.to_string())
     }
 }
