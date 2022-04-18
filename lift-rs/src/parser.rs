@@ -2,7 +2,8 @@ use regex::Regex;
 use std::fmt;
 use lazy_static::lazy_static;
 use crate::content::{TextElement, TextContent};
-use crate::expression::{ExpressionParser, Expression};
+use crate::expression_parser::ExpressionParser;
+use crate::expression::Expression;
 
 pub enum ParserResult<Token, Error, Size> {
     Some(Token, Size), // Token and size to consume
