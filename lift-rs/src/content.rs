@@ -5,7 +5,6 @@ use crate::parser::{ContentParser, Parser, ContentToken, Params, ContentError};
 pub enum Content {
     Text(TextContent),
     Link(Action),
-    Input { variable: String, page: String, action: usize },
     Set { local: bool, variable: String, indices: Vec<Expression>, expression: Expression },
     If { expression: Expression, content: Vec<Content> },
     ElseIf { expression: Expression, content: Vec<Content> },
@@ -23,11 +22,23 @@ impl Content {
     }
 }
 
+#[derive(Clone)]
+pub struct PageAction {
+    pub page: String,
+    pub index: usize
+}
+
+impl PageAction {
+    fn new(page: &str, index: usize) -> Self {
+        PageAction {page: page.to_string(), index}
+    }
+}
+
 pub enum Action {
     Normal { title: TextContent, destination: TextContent },
-    Content { title: TextContent, page: String, action: usize },
-    JumpLink { title: TextContent, destination: TextContent, page: String, action: usize}
-    //Input { title: String, variable: String, content: Vec<Content> },
+    Content { title: TextContent, action: PageAction },
+    JumpLink { title: TextContent, destination: TextContent, action: PageAction},
+    Input { variable: String, action: PageAction }
     //Choice { title: String, variable: String, choices: String, content: Vec<Content> }
 }
 
@@ -102,7 +113,7 @@ impl Content {
             ("link", Args::Two(Params::Text(title), Params::Text(destination)), Some(content)) => {
                 let action = actions.len();
                 actions.push(content);
-                Content::Link(Action::JumpLink{title, destination, page: page.to_string(), action})
+                Content::Link(Action::JumpLink{title, destination, action: PageAction::new(page, action)})
             }
             ("link", Args::Two(Params::Text(title), Params::Text(destination)), None) => {
                 Content::Link(Action::Normal{title, destination})
@@ -110,12 +121,12 @@ impl Content {
             ("link", Args::One(Params::Text(title)), Some(content)) => {
                let action = actions.len();
                actions.push(content);
-               Content::Link(Action::Content{title, page: page.to_string(), action})
+               Content::Link(Action::Content{title, action: PageAction::new(page, action)})
             }
             ("input", Args::One(Params::Variable(variable)), Some(content)) => {
                 let action = actions.len();
                 actions.push(content);
-                Content::Input{variable, page: page.to_string(), action}
+                Content::Link(Action::Input{variable, action: PageAction::new(page, action)})
             }
             ("goto", Args::One(Params::Text(page)), None) => Content::Goto(page),
             ("import", Args::One(Params::Text(page)), None) => Content::Import(page),

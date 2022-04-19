@@ -96,8 +96,8 @@ fn render(interpreter: &Interpreter) -> (String, Vec<UserActions>) {
                 }
             }
             Element::Link(title, _)
-            | Element::ContentLink(title, _, _)
-            | Element::JumpLink(title, _, _, _) => {
+            | Element::ContentLink(title, _)
+            | Element::JumpLink(title, _, _) => {
                 match last {
                     Text => ret += "\n",
                     Break => ret += "\n\n",
@@ -108,7 +108,7 @@ fn render(interpreter: &Interpreter) -> (String, Vec<UserActions>) {
                 input_id += 1;
                 choices.push(UserActions::Tap(index));
             }
-            Element::Input(_, _, _) => {
+            Element::Input(_, _) => {
                 match last {
                     Text => ret += "\n",
                     Break => ret += "\n\n",

@@ -5,7 +5,7 @@ use std::rc::Rc;
 use regex::Regex;
 use lazy_static::lazy_static;
 
-use crate::content::{Page, Content, Action};
+use crate::content::{Page, Content, Action, PageAction};
 use crate::parser::ContentError;
 use crate::expression::StateManager;
 use crate::value::Value;
@@ -14,9 +14,9 @@ use crate::value::Value;
 pub enum Element {
     Text(String),
     Link(String, String),
-    ContentLink(String, String, usize),
-    JumpLink(String, String, String, usize),
-    Input(String, String, usize),
+    ContentLink(String, PageAction),
+    JumpLink(String, String, PageAction),
+    Input(String, PageAction),
     Error(String)
 }
 
@@ -116,9 +116,9 @@ impl Story {
         ))
     }
 
-    fn get_action(&self, title: &str, index: usize) -> Option<&Vec<Content>> {
-        let page = self.pages.get(title)?;
-        return page.actions.get(index);
+    fn get_action(&self, action: PageAction) -> Option<&Vec<Content>> {
+        let page = self.pages.get(&action.page)?;
+        return page.actions.get(action.index);
     }
 }
 
@@ -224,21 +224,21 @@ impl Interpreter {
             self.state.current_page = destination.to_string();
             self.play();
         }
-        else if let Some(Element::ContentLink(_, page, action_index)) = element {
-            if let Some(content) = story.get_action(&page, action_index) {
+        else if let Some(Element::ContentLink(_, action)) = element {
+            if let Some(content) = story.get_action(action) {
                 let result = self.eval(content);
                 self.process_result(result, index);
             }
         }
-        else if let Some(Element::JumpLink(_, destination, page, action_index)) = element {
-            if let Some(content) = story.get_action(&page, action_index) {
+        else if let Some(Element::JumpLink(_, destination, action)) = element {
+            if let Some(content) = story.get_action(action) {
                 let mut result = self.eval(content);
                 result.action = StoryAction::Goto(destination.to_string());
                 self.process_result(result, index);
             }
         }
-        else if let Some(Element::Input(variable, page, action_index)) = element {
-            if let Some(content) = story.get_action(&page, action_index) {
+        else if let Some(Element::Input(variable, action)) = element {
+            if let Some(content) = story.get_action(action) {
                 self.state.set_local(&variable, value);
                 let result = self.eval(content);
                 self.process_result(result, index);
@@ -284,17 +284,16 @@ impl Interpreter {
                         Action::Normal{title, destination} => {
                             Element::Link(title.eval(&self.state), destination.eval(&self.state))
                         }
-                        Action::Content{title, page, action} => {
-                            Element::ContentLink(title.eval(&self.state), page.to_string(), *action) 
+                        Action::Content{title, action} => {
+                            Element::ContentLink(title.eval(&self.state), action.clone())
                         }
-                        Action::JumpLink{title, destination, page, action} => {
-                            Element::JumpLink(title.eval(&self.state), destination.eval(&self.state), page.to_string(), *action) 
+                        Action::JumpLink{title, destination, action} => {
+                            Element::JumpLink(title.eval(&self.state), destination.eval(&self.state), action.clone())
+                        }
+                        Action::Input{variable, action} => {
+                            Element::Input(variable.to_string(), action.clone())
                         }
                     };
-                    result.push(element);
-                }
-                Content::Input{variable, page, action} => {
-                    let element = Element::Input(variable.to_string(), page.to_string(), *action);
                     result.push(element);
                 }
                 Content::Goto(page) => {result.action = StoryAction::Goto(page.eval(&self.state))},
