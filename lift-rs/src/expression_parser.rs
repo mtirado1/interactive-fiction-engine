@@ -77,6 +77,7 @@ impl ParserToken {
             }
             (Some(a), Some(b)) => {
                 return (a.is_end_token() && b.is_start_token())
+                || (a.is_value() && b.is_value())
                 || (a.is_value() && b.is_start_token())
                 || (a.is_end_token() && b.is_value());
             }

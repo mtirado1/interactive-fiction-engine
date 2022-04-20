@@ -353,6 +353,8 @@ impl Value {
             "rand" => {
                 match (values.get(0), values.get(1)) {
                     (None, None) => Float(fastrand::f64()),
+                    (Some(Integer(a)), None) => Integer(fastrand::i64(0..*a)),
+                    (Some(Float(a)), None) => Float(fastrand::f64() * a),
                     (Some(Integer(a)), Some(Integer(b))) => Integer(fastrand::i64(a..b)),
                     (Some(Float(a)), Some(Float(b))) => Float(a + fastrand::f64() * (b - a)),
                     (Some(Integer(a)), Some(Float(b))) => Float(*a as f64 + fastrand::f64() * (b - *a as f64)),
