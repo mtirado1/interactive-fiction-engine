@@ -73,7 +73,7 @@ use UnaryOperator::*;
 impl UnaryOperator {
     pub fn precedence(&self) -> u32 {
         match self {
-            Minus | Plus | Not => 6
+            Minus | Plus | Not => 100
         }
     }
 
