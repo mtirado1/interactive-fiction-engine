@@ -20,7 +20,7 @@ fn prompt(interpreter: &mut Interpreter, choices: Vec<UserActions>) {
     match input.trim().to_lowercase().as_str() {
         "quit" | "exit" | "q" => process::exit(0),
         "help" | "h" | "?" => print_help(),
-		"load" => load_state(interpreter),
+        "load" => load_state(interpreter),
         "save" | "s" => save_state(interpreter),
         _ => {
             if let Ok(choice) = input.trim().parse::<u32>() {
@@ -36,9 +36,9 @@ fn load_state(interpreter: &mut Interpreter) {
     let file = "lift_state.json";
     if let Ok(json) = fs::read_to_string(file) {
         if let Ok(_) = interpreter.load_state(&json) {
-			println!("Loading state...");
-			return;
-		}
+            println!("Loading state...");
+            return;
+        }
     }
     eprintln!("Error while reading file '{}'", file);
 }
@@ -47,9 +47,10 @@ fn save_state(interpreter: &Interpreter) {
     if let Some(json) = interpreter.dump_state() {
         let path = "lift_state.json";
         if let Ok(mut file) = fs::File::create(path) {
-            write!(file, "{}", json);
-            println!("State saved to {}", path);
-            return;
+            if let Ok(_) = write!(file, "{}", json) {
+                println!("State saved to {}", path);
+                return;
+            }
         }
     }
     println!("Failed to save state.");

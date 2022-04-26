@@ -132,15 +132,11 @@ struct State {
 }
 
 impl State {
-    fn new(story: &Story) -> State {
-        let mut local = HashMap::<String, HashMap<String, Value>>::new();
-        for (title, _) in story.pages.iter() {
-            local.insert(title.to_string(), HashMap::<String, Value>::new());
-        }
+    fn new(first_page: &str) -> State {
         State {
-            current_page: story.first_page.clone(),
-            global: HashMap::<String, Value>::new(),
-            local,
+            current_page: first_page.to_string(),
+            global: HashMap::new(),
+            local: HashMap::new(),
             output: vec![]
         }
     }
@@ -170,9 +166,15 @@ impl State {
     }
 
     fn set_local(&mut self, variable: &str, value: Value) -> Option<()> {
-        let state = self.local.get_mut(&self.current_page)?;
+        let state = match self.local.get_mut(&self.current_page) {
+            Some(state) => state,
+            None => {
+                self.local.insert(self.current_page.to_string(), HashMap::new());
+                self.local.get_mut(&self.current_page)?
+            }
+        };
         state.insert(variable.to_string(), value);
-        return Some(());
+        Some(())
     }
 
     fn set_local_index(&mut self, variable: &str, indices: &Vec<Value>, value: Value) -> Option<()> {
@@ -199,7 +201,7 @@ pub struct Interpreter {
 
 impl Interpreter {
     pub fn new(story: Story) ->  Self {
-        let state = State::new(&story);
+        let state = State::new(&story.first_page);
         Interpreter {
             story: Rc::new(story),
             state,
