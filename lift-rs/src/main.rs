@@ -17,29 +17,74 @@ fn prompt(interpreter: &mut Interpreter, choices: Vec<UserActions>) {
     io::stdin()
         .read_line(&mut input)
         .expect("Failed to read input");
-    if let Ok(choice) = input.trim().parse::<u32>() {
-        if let Some(action) = choices.get((choice - 1) as usize) {
-            match action {
-                UserActions::Tap(i) => interpreter.send(*i, Value::Null),
-                UserActions::Prompt(i) => {
-                    let mut user_input = String::new();
-                    print!(" -> ");
-                    let _ = io::stdout().flush();
-                    io::stdin()
-                        .read_line(&mut user_input)
-                        .expect("Failed to read input");
-                    user_input = user_input.trim().to_string();
-                    interpreter.send(*i, Value::Text(user_input));
-                }
+    match input.trim().to_lowercase().as_str() {
+        "quit" | "exit" | "q" => process::exit(0),
+        "help" | "h" | "?" => print_help(),
+		"load" => load_state(interpreter),
+        "save" | "s" => save_state(interpreter),
+        _ => {
+            if let Ok(choice) = input.trim().parse::<u32>() {
+                handle_choice(interpreter, choices, choice)
+            } else {
+                println!("Invalid command.");
             }
         }
-        else {
-            println!("Invalid choice.");
+    }
+}
+
+fn load_state(interpreter: &mut Interpreter) {
+    let file = "lift_state.json";
+    if let Ok(json) = fs::read_to_string(file) {
+        if let Ok(_) = interpreter.load_state(&json) {
+			println!("Loading state...");
+			return;
+		}
+    }
+    eprintln!("Error while reading file '{}'", file);
+}
+
+fn save_state(interpreter: &Interpreter) {
+    if let Some(json) = interpreter.dump_state() {
+        let path = "lift_state.json";
+        if let Ok(mut file) = fs::File::create(path) {
+            write!(file, "{}", json);
+            println!("State saved to {}", path);
+            return;
         }
     }
-    else {
-        println!("Invalid input.");
-    }
+    println!("Failed to save state.");
+}
+
+fn print_help() {
+    println!("lift {} - A Language for Interactive Fiction Texts\n", env!("CARGO_PKG_VERSION"));
+    println!(concat!(
+        "Command Reference:\n",
+        "  quit | exit | q   Quit Lift\n",
+        "  save | s          Save state to file\n",
+        "  help | h | ?      Display this help message\n",
+        "  [N]               Execute action N"
+    ));
+}
+
+fn handle_choice(interpreter: &mut Interpreter, choices: Vec<UserActions>, choice: u32) {
+  if let Some(action) = choices.get((choice - 1) as usize) {
+       match action {
+           UserActions::Tap(i) => interpreter.send(*i, Value::Null),
+           UserActions::Prompt(i) => {
+               let mut user_input = String::new();
+               print!(" -> ");
+               let _ = io::stdout().flush();
+               io::stdin()
+                   .read_line(&mut user_input)
+                   .expect("Failed to read input");
+               user_input = user_input.trim().to_string();
+               interpreter.send(*i, Value::Text(user_input));
+           }
+       }
+   }
+   else {
+       println!("Invalid choice.");
+   }
 }
 
 fn play(interpreter: &mut Interpreter) {

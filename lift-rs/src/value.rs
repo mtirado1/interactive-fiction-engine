@@ -1,9 +1,11 @@
 use std::fmt;
 use std::ops;
 use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
 use fastrand;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(tag = "type", content="value")]
 pub enum Value {
     Integer(i64),
     Float(f64),

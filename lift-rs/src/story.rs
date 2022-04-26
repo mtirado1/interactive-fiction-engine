@@ -4,13 +4,14 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use regex::Regex;
 use lazy_static::lazy_static;
-
+use serde::{Serialize, Deserialize};
 use crate::content::{Page, Content, Action, PageAction};
 use crate::parser::ContentError;
 use crate::expression::StateManager;
 use crate::value::Value;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(tag = "type", content = "value")]
 pub enum Element {
     Text(String),
     Link(String, String),
@@ -122,10 +123,12 @@ impl Story {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 struct State {
     current_page: String,
     global: HashMap<String, Value>,
-    local: HashMap<String, HashMap<String, Value>>
+    local: HashMap<String, HashMap<String, Value>>,
+    output: Vec<Element>
 }
 
 impl State {
@@ -137,7 +140,8 @@ impl State {
         State {
             current_page: story.first_page.clone(),
             global: HashMap::<String, Value>::new(),
-            local
+            local,
+            output: vec![]
         }
     }
 
@@ -190,7 +194,6 @@ impl StateManager for State {
 
 pub struct Interpreter {
     story: Rc<Story>,
-    output: Vec<Element>,
     state: State
 }
 
@@ -200,25 +203,24 @@ impl Interpreter {
         Interpreter {
             story: Rc::new(story),
             state,
-            output: Vec::<Element>::new()
         }
     }
 
     fn process_result(&mut self, result: StoryResult, index: usize) {
         match result.action {
             StoryAction::Halt => {
-                self.output.splice(index..index+1, result.output);
+                self.state.output.splice(index..index+1, result.output);
             }
             StoryAction::Goto(page) => {
                 self.state.current_page = page;
                 self.play();
-                self.output.splice(0..0, result.output);
+                self.state.output.splice(0..0, result.output);
             }
         }
     }
 
     pub fn send(&mut self, index: usize, value: Value) {
-        let element: Option<Element> = self.output.get(index).cloned();
+        let element: Option<Element> = self.state.output.get(index).cloned();
         let story = &Rc::clone(&self.story);
         if let Some(Element::Link(_, destination)) = element {
             self.state.current_page = destination.to_string();
@@ -247,30 +249,42 @@ impl Interpreter {
     }
 
     pub fn play(&mut self) {
-        self.output.clear();
+        self.state.output.clear();
         let story: &Story = &Rc::clone(&self.story);
         loop {
             if let Some(page) = story.pages.get(&self.state.current_page) {
                 let mut result = self.eval(&page.content);
-                self.output.append(&mut result.output);
+                self.state.output.append(&mut result.output);
                 match result.action {
                     StoryAction::Halt => break,
                     StoryAction::Goto(p) => {
-                        self.output.clear();
+                        self.state.output.clear();
                         self.state.current_page = p
                     }
                 }
             }
             else {
-                self.output.push(Element::Error(format!("Invalid page: '{}'", self.state.current_page)));
+                self.state.output.push(Element::Error(format!("Invalid page: '{}'", self.state.current_page)));
                 break;
             }
         }
     }
 
     pub fn output(&self) -> &Vec<Element> {
-        &self.output
+        &self.state.output
     }
+
+    pub fn dump_state(&self) -> Option<String> {
+        if let Ok(json) = serde_json::to_string(&self.state) {
+            return Some(json)
+        }
+        None
+    }
+
+	pub fn load_state(&mut self, json: &str) -> serde_json::Result<()> {
+		self.state = serde_json::from_str(json)?;
+		Ok(())
+	}
 
     fn eval(&mut self, content: &Vec<Content>) -> StoryResult {
         let mut result = StoryResult::new();

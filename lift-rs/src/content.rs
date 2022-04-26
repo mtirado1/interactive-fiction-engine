@@ -1,4 +1,5 @@
 // Content Parser
+use serde::{Serialize, Deserialize};
 use crate::expression::*;
 use crate::parser::{ContentParser, Parser, ContentToken, Params, ContentError};
 
@@ -22,7 +23,7 @@ impl Content {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct PageAction {
     pub page: String,
     pub index: usize
